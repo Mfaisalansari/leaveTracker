@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Leave Tracker</title>
+
+<style>
+  /* System font stacks — no external dependencies */
+  :root {
+    --font-sans:   -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-serif:  Georgia, "Times New Roman", serif;
+    --font-mono:   ui-monospace, "Cascadia Code", "Segoe UI Mono", "Roboto Mono", Consolas, "Courier New", monospace;
+
+    --ink: #1a1a2e;
+    --paper: #f5f0e8;
+    --cream: #ede8de;
+    --rust: #c0392b;
+    --sage: #27ae60;
+    --amber: #e67e22;
+    --violet: #8e44ad;
+    --steel: #2980b9;
+    --gold: #d4a017;
+    --border: #c8c0b0;
+    --muted: #7a7060;
+    --card: #faf8f4;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: var(--font-sans);
+    background: var(--paper);
+    color: var(--ink);
+    min-height: 100vh;
+  }
+
+  /* ─── HEADER ─── */
+  .header {
+    background: var(--ink);
+    color: var(--paper);
+    padding: 20px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 3px solid var(--gold);
+  }
+  .header-left h1 {
+    font-family: var(--font-serif);
+    font-size: 22px;
+    letter-spacing: 0.02em;
+  }
+  .header-left span {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--gold);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+  }
+  .header-right {
+    display: flex;
+    gap: 10px;
+  }
+  .tab-btn {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 8px 20px;
+    border: 1px solid rgba(245,240,232,0.25);
+    background: transparent;
+    color: var(--paper);
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.2s;
+  }
+  .tab-btn.active, .tab-btn:hover {
+    background: var(--gold);
+    color: var(--ink);
+    border-color: var(--gold);
+  }
+
+  /* ─── LAYOUT ─── */
+  .main {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 0;
+    min-height: calc(100vh - 73px);
+  }
+
+  /* ─── SIDEBAR / FORM ─── */
+  .sidebar {
+    background: var(--card);
+    border-right: 1px solid var(--border);
+    padding: 28px 24px;
+    overflow-y: auto;
+  }
+
+  .section-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .form-group {
+    margin-bottom: 16px;
+  }
+  .form-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
+  }
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    background: var(--paper);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    color: var(--ink);
+    border-radius: 3px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .form-group input:focus,
+  .form-group select:focus,
+  .form-group textarea:focus {
+    border-color: var(--ink);
+    background: #fff;
+  }
+  .form-group textarea { resize: vertical; min-height: 72px; }
+
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  /* Leave type badges */
+  .type-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .type-option {
+    position: relative;
+  }
+  .type-option input[type="radio"] { display: none; }
+  .type-option label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    border: 1.5px solid var(--border);
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--ink);
+    transition: all 0.15s;
+    background: var(--paper);
+  }
+  .type-option input:checked + label {
+    border-color: var(--ink);
+    background: var(--ink);
+    color: var(--paper);
+  }
+  .type-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .submit-btn {
+    width: 100%;
+    padding: 13px;
+    background: var(--ink);
+    color: var(--paper);
+    border: none;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 3px;
+    margin-top: 8px;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .submit-btn:hover { background: var(--gold); color: var(--ink); }
+
+  /* Stats strip */
+  .stats-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+  .stat-card {
+    background: var(--paper);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 12px;
+    text-align: center;
+  }
+  .stat-num {
+    font-family: var(--font-serif);
+    font-size: 22px;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .stat-lbl {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+  }
+
+  /* ─── CALENDAR PANEL ─── */
+  .calendar-panel {
+    padding: 28px 28px;
+    background: var(--paper);
+  }
+
+  .cal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+  }
+  .cal-title {
+    font-family: var(--font-serif);
+    font-size: 24px;
+  }
+  .cal-nav {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .cal-nav-btn {
+    width: 34px; height: 34px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .cal-nav-btn:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+  .cal-month-lbl {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    min-width: 130px;
+    text-align: center;
+  }
+
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+    margin-bottom: 20px;
+  }
+  .cal-day-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    text-align: center;
+    padding: 6px 0;
+  }
+  .cal-cell {
+    min-height: 78px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 5px;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+    overflow: hidden;
+  }
+  .cal-cell:hover { border-color: var(--ink); z-index: 1; }
+  .cal-cell.empty { background: transparent; border-color: transparent; cursor: default; }
+  .cal-cell.today {
+    border-color: var(--gold);
+    border-width: 2px;
+  }
+  .cal-cell.today .cal-date { color: var(--gold); font-weight: 600; }
+  .cal-cell.weekend { background: var(--cream); }
+  .cal-date {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .leave-chip {
+    display: block;
+    font-size: 9px;
+    font-weight: 500;
+    padding: 2px 5px;
+    border-radius: 2px;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #fff;
+    letter-spacing: 0.02em;
+  }
+
+  /* ─── LEAVE LIST ─── */
+  .leave-list { margin-top: 4px; }
+  .leave-item {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    margin-bottom: 8px;
+    overflow: hidden;
+    transition: box-shadow 0.15s;
+  }
+  .leave-item:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  .leave-item-stripe { width: 4px; flex-shrink: 0; }
+  .leave-item-body { padding: 12px 14px; flex: 1; }
+  .leave-item-name {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 3px;
+  }
+  .leave-item-meta {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+  }
+  .leave-item-actions {
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 6px;
+  }
+  .action-btn {
+    width: 28px; height: 28px;
+    border: 1px solid var(--border);
+    background: var(--paper);
+    border-radius: 2px;
+    cursor: pointer;
+    font-size: 12px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .action-btn:hover { background: var(--rust); color: #fff; border-color: var(--rust); }
+  .status-badge {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 2px 7px;
+    border-radius: 2px;
+    margin-top: 4px;
+  }
+
+  /* ─── TOAST ─── */
+  .toast {
+    position: fixed;
+    bottom: 24px; right: 24px;
+    background: var(--ink);
+    color: var(--paper);
+    padding: 13px 20px;
+    border-left: 3px solid var(--gold);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    border-radius: 3px;
+    transform: translateY(80px);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    z-index: 999;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+
+  /* ─── MODAL ─── */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(26,26,46,0.5);
+    backdrop-filter: blur(3px);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 100;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.2s;
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+  .modal {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 28px;
+    width: 420px;
+    transform: translateY(20px);
+    transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .modal-overlay.open .modal { transform: translateY(0); }
+  .modal h3 { font-family: var(--font-serif); font-size: 20px; margin-bottom: 16px; }
+  .modal-detail { margin-bottom: 10px; }
+  .modal-detail span { font-family: var(--font-mono); font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .modal-detail p { font-size: 14px; margin-top: 2px; }
+  .modal-actions { display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end; }
+  .btn-outline {
+    padding: 9px 18px;
+    border: 1px solid var(--border);
+    background: transparent;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.15s;
+  }
+  .btn-outline:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+  .legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+  }
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 2px;
+  }
+
+  /* VIEW TOGGLE */
+  .view-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 20px;
+  }
+  .view-tab {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.15s;
+    color: var(--muted);
+  }
+  .view-tab.active { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+
+  .view-section { display: none; }
+  .view-section.active { display: block; }
+
+  @media (max-width: 900px) {
+    .main { grid-template-columns: 1fr; }
+    .sidebar { border-right: none; border-bottom: 1px solid var(--border); }
+  }
+</style>
+
+</head>
+<body>
+
+<!-- HEADER -->
+
+<div class="header">
+  <div class="header-left">
+    <span>Team Space · HR Tools</span>
+    <h1>Leave Tracker</h1>
+
+  </div>
+  <div class="header-right">
+    <button class="tab-btn active" onclick="setMainTab('calendar', this)">📅 Calendar</button>
+    <button class="tab-btn" onclick="setMainTab('list', this)">📋 All Leaves</button>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- SIDEBAR -->
+
+  <div class="sidebar">
+    <div class="section-label">Leave Balance</div>
+    <div class="stats-strip">
+      <div class="stat-card">
+        <div class="stat-num" id="stat-total" style="color:var(--steel)">0</div>
+        <div class="stat-lbl">Total</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" id="stat-on-leave" style="color:var(--rust)">0</div>
+        <div class="stat-lbl">On Leave</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" id="stat-wfh" style="color:var(--sage)">0</div>
+        <div class="stat-lbl">WFH</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-num" id="stat-days" style="color:var(--violet)">0</div>
+        <div class="stat-lbl">Days</div>
+      </div>
+    </div>
+
+```
+<div class="section-label">Request Leave</div>
+
+<div class="form-group">
+  <label>Employee Name</label>
+  <input type="text" id="f-name" placeholder="e.g. Jane Smith">
+</div>
+
+<div class="form-group">
+  <label>Leave Type</label>
+  <div class="type-grid">
+    <div class="type-option">
+      <input type="radio" name="leave-type" id="t-annual" value="Annual Leave" checked>
+      <label for="t-annual"><span class="type-dot" style="background:#2980b9"></span>Annual</label>
+    </div>
+    <div class="type-option">
+      <input type="radio" name="leave-type" id="t-sick" value="Sick Leave">
+      <label for="t-sick"><span class="type-dot" style="background:#c0392b"></span>Sick</label>
+    </div>
+    <div class="type-option">
+      <input type="radio" name="leave-type" id="t-wfh" value="Work From Home">
+      <label for="t-wfh"><span class="type-dot" style="background:#27ae60"></span>WFH</label>
+    </div>
+    <div class="type-option">
+      <input type="radio" name="leave-type" id="t-unpaid" value="Unpaid Leave">
+      <label for="t-unpaid"><span class="type-dot" style="background:#7a7060"></span>Unpaid</label>
+    </div>
+    <div class="type-option">
+      <input type="radio" name="leave-type" id="t-comp" value="Compensatory">
+      <label for="t-comp"><span class="type-dot" style="background:#8e44ad"></span>Comp Off</label>
+    </div>
+    <div class="type-option">
+      <input type="radio" name="leave-type" id="t-other" value="Other">
+      <label for="t-other"><span class="type-dot" style="background:#d4a017"></span>Other</label>
+    </div>
+  </div>
+</div>
+
+<div class="form-row">
+  <div class="form-group">
+    <label>Start Date</label>
+    <input type="date" id="f-start">
+  </div>
+  <div class="form-group">
+    <label>End Date</label>
+    <input type="date" id="f-end">
+  </div>
+</div>
+
+<div class="form-group">
+  <label>Reason / Notes</label>
+  <textarea id="f-reason" placeholder="Optional: brief reason for leave..."></textarea>
+</div>
+
+<button class="submit-btn" onclick="addLeave()">＋ Submit Leave Request</button>
+
+<!-- Legend -->
+<div style="margin-top:24px;">
+  <div class="section-label">Legend</div>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#2980b9"></div>Annual</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#c0392b"></div>Sick</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#27ae60"></div>WFH</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#8e44ad"></div>Comp Off</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#7a7060"></div>Unpaid</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#d4a017"></div>Other</div>
+  </div>
+</div>
+```
+
+  </div>
+
+  <!-- CALENDAR PANEL -->
+
+  <div class="calendar-panel">
+    <!-- Calendar View -->
+    <div id="view-calendar" class="view-section active">
+      <div class="cal-header">
+        <div class="cal-title" id="cal-month-title">May 2026</div>
+        <div class="cal-nav">
+          <button class="cal-nav-btn" onclick="changeMonth(-1)">‹</button>
+          <div class="cal-month-lbl" id="cal-month-lbl">May 2026</div>
+          <button class="cal-nav-btn" onclick="changeMonth(1)">›</button>
+          <button class="cal-nav-btn" onclick="goToToday()" title="Today" style="font-size:11px;font-family:var(--font-mono);width:auto;padding:0 10px;">Today</button>
+        </div>
+      </div>
+      <div class="cal-grid" id="cal-grid"></div>
+    </div>
+
+```
+<!-- List View -->
+<div id="view-list" class="view-section">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+    <div class="section-label" style="margin:0">All Leave Records</div>
+    <span id="list-count" style="font-family:var(--font-mono);font-size:10px;color:var(--muted);letter-spacing:0.06em;"></span>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center;">
+    <div style="display:flex;align-items:center;gap:6px;">
+      <label style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);">From</label>
+      <input type="date" id="filter-from" onchange="renderList()" style="font-family:var(--font-mono);font-size:11px;padding:6px 10px;border:1px solid var(--border);background:var(--card);border-radius:2px;color:var(--ink);outline:none;">
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <label style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);">To</label>
+      <input type="date" id="filter-to" onchange="renderList()" style="font-family:var(--font-mono);font-size:11px;padding:6px 10px;border:1px solid var(--border);background:var(--card);border-radius:2px;color:var(--ink);outline:none;">
+    </div>
+    <select id="filter-type" onchange="renderList()" style="font-family:var(--font-mono);font-size:11px;padding:6px 10px;border:1px solid var(--border);background:var(--card);border-radius:2px;color:var(--ink);">
+      <option value="">All Types</option>
+      <option>Annual Leave</option>
+      <option>Sick Leave</option>
+      <option>Work From Home</option>
+      <option>Compensatory</option>
+      <option>Unpaid Leave</option>
+      <option>Other</option>
+    </select>
+    <button onclick="clearListFilters()" style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.07em;padding:7px 12px;border:1px solid var(--border);background:var(--paper);border-radius:2px;cursor:pointer;color:var(--muted);">✕ Clear</button>
+  </div>
+  <div id="leave-list-container" class="leave-list"></div>
+</div>
+```
+
+  </div>
+
+</div>
+
+<!-- MODAL -->
+
+<div class="modal-overlay" id="modal" onclick="closeModal(event)">
+  <div class="modal">
+    <h3 id="modal-name"></h3>
+    <div class="modal-detail"><span>Leave Type</span><p id="modal-type"></p></div>
+    <div class="modal-detail"><span>Duration</span><p id="modal-dates"></p></div>
+    <div class="modal-detail"><span>Days</span><p id="modal-days"></p></div>
+    <div class="modal-detail" id="modal-reason-wrap"><span>Reason</span><p id="modal-reason"></p></div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- DAY DETAIL POPUP -->
+
+<div class="modal-overlay" id="day-modal" onclick="closeDayModal(event)">
+  <div class="modal" style="width:480px;max-width:95vw;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+      <div>
+        <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);margin-bottom:4px;">Day Detail</div>
+        <h3 id="day-modal-title" style="font-family:var(--font-serif);font-size:22px;"></h3>
+      </div>
+      <span id="day-modal-count" style="font-family:var(--font-mono);font-size:11px;background:var(--ink);color:var(--paper);padding:5px 12px;border-radius:2px;letter-spacing:0.06em;"></span>
+    </div>
+    <div id="day-modal-body" style="display:flex;flex-direction:column;gap:8px;max-height:380px;overflow-y:auto;"></div>
+    <div class="modal-actions" style="margin-top:18px;">
+      <button class="btn-outline" onclick="closeDayModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── DATA ───
+const TYPE_COLORS = {
+  'Annual Leave': '#2980b9',
+  'Sick Leave': '#c0392b',
+  'Work From Home': '#27ae60',
+  'Compensatory': '#8e44ad',
+  'Unpaid Leave': '#7a7060',
+  'Other': '#d4a017'
+};
+
+const STATUS_COLORS = {};
+
+let leaves = JSON.parse(localStorage.getItem('lt-leaves') || '[]');
+let currentYear, currentMonth;
+
+const now = new Date();
+currentYear = now.getFullYear();
+currentMonth = now.getMonth();
+
+// ─── INIT ───
+setTodayDefaults();
+renderCalendar();
+updateStats();
+
+function setTodayDefaults() {
+  const td = now.toISOString().split('T')[0];
+  document.getElementById('f-start').value = td;
+  document.getElementById('f-end').value = td;
+}
+
+function save() {
+  localStorage.setItem('lt-leaves', JSON.stringify(leaves));
+}
+
+// ─── ADD LEAVE ───
+function addLeave() {
+  const name   = document.getElementById('f-name').value.trim();
+  const type   = document.querySelector('input[name="leave-type"]:checked').value;
+  const start  = document.getElementById('f-start').value;
+  const end    = document.getElementById('f-end').value;
+  const reason = document.getElementById('f-reason').value.trim();
+
+  if (!name) { showToast('⚠ Please enter an employee name'); return; }
+  if (!start || !end) { showToast('⚠ Please select dates'); return; }
+  if (start > end) { showToast('⚠ End date must be after start date'); return; }
+
+  const id = Date.now().toString(36);
+  leaves.push({ id, name, type, start, end, reason });
+  save();
+  updateStats();
+  renderCalendar();
+  if (document.getElementById('view-list').classList.contains('active')) renderList();
+  showToast('✓ Leave added');
+  document.getElementById('f-name').value = '';
+  document.getElementById('f-reason').value = '';
+}
+
+// ─── STATS ───
+function updateStats() {
+  const todayStr = now.toISOString().split('T')[0];
+  document.getElementById('stat-total').textContent = leaves.length;
+  document.getElementById('stat-on-leave').textContent = leaves.filter(l=>
+    l.start<=todayStr && l.end>=todayStr && l.type!=='Work From Home'
+  ).length;
+  document.getElementById('stat-wfh').textContent = leaves.filter(l=>
+    l.start<=todayStr && l.end>=todayStr && l.type==='Work From Home'
+  ).length;
+  const days = leaves.reduce((s,l)=>s+countDays(l.start,l.end),0);
+  document.getElementById('stat-days').textContent = days;
+}
+
+function countDays(s,e) {
+  return Math.round((new Date(e)-new Date(s))/864e5)+1;
+}
+
+// ─── CALENDAR ───
+function renderCalendar() {
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const label = `${monthNames[currentMonth]} ${currentYear}`;
+  document.getElementById('cal-month-title').textContent = label;
+  document.getElementById('cal-month-lbl').textContent = label;
+
+  const grid = document.getElementById('cal-grid');
+  grid.innerHTML = '';
+
+  // Day labels
+  ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(d=>{
+    const el = document.createElement('div');
+    el.className = 'cal-day-label';
+    el.textContent = d;
+    grid.appendChild(el);
+  });
+
+  const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+  const daysInMonth = new Date(currentYear, currentMonth+1, 0).getDate();
+  const todayStr = now.toISOString().split('T')[0];
+
+  // Empty cells
+  for(let i=0;i<firstDay;i++){
+    const el=document.createElement('div'); el.className='cal-cell empty'; grid.appendChild(el);
+  }
+
+  // Day cells
+  for(let d=1;d<=daysInMonth;d++){
+    const dateStr = `${currentYear}-${String(currentMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const el = document.createElement('div');
+    el.className = 'cal-cell';
+    const dow = new Date(dateStr).getDay();
+    if(dow===0||dow===6) el.classList.add('weekend');
+    if(dateStr===todayStr) el.classList.add('today');
+
+    // Leaves on this day
+    const dayLeaves = leaves.filter(l=> l.start<=dateStr && l.end>=dateStr);
+
+    const dateDiv = document.createElement('div');
+    dateDiv.className = 'cal-date';
+    dateDiv.textContent = d;
+    dateDiv.style.cursor = 'pointer';
+    dateDiv.style.display = 'inline-block';
+    dateDiv.style.borderBottom = dayLeaves.length ? '1.5px dashed var(--gold)' : 'none';
+    dateDiv.title = dayLeaves.length ? `${dayLeaves.length} on leave — click to view` : '';
+    dateDiv.onclick = (e) => { e.stopPropagation(); openDayModal(dateStr, dayLeaves); };
+    el.appendChild(dateDiv);
+    dayLeaves.slice(0,3).forEach(l=>{
+      const chip = document.createElement('span');
+      chip.className = 'leave-chip';
+      chip.style.background = TYPE_COLORS[l.type] || '#888';
+      chip.textContent = l.name.split(' ')[0];
+      chip.title = `${l.name} · ${l.type}`;
+      chip.onclick = (e)=>{ e.stopPropagation(); openModal(l); };
+      el.appendChild(chip);
+    });
+    if(dayLeaves.length>3){
+      const more=document.createElement('span');
+      more.className='leave-chip';
+      more.style.background='#888';
+      more.textContent=`+${dayLeaves.length-3} more`;
+      el.appendChild(more);
+    }
+
+    grid.appendChild(el);
+  }
+}
+
+function changeMonth(dir){
+  currentMonth += dir;
+  if(currentMonth>11){currentMonth=0;currentYear++;}
+  if(currentMonth<0){currentMonth=11;currentYear--;}
+  renderCalendar();
+}
+function goToToday(){
+  currentYear=now.getFullYear(); currentMonth=now.getMonth(); renderCalendar();
+}
+
+// ─── LIST VIEW ───
+function renderList() {
+  const container = document.getElementById('leave-list-container');
+  if (!container) return;
+
+  const fTypeEl = document.getElementById('filter-type');
+  const fFromEl = document.getElementById('filter-from');
+  const fToEl   = document.getElementById('filter-to');
+
+  const fType = fTypeEl ? fTypeEl.value : '';
+  const fFrom = fFromEl ? fFromEl.value : '';
+  const fTo   = fToEl   ? fToEl.value   : '';
+
+  let filtered = leaves.filter(l=>{
+    if(fType && l.type!==fType) return false;
+    if(fFrom && l.end < fFrom) return false;
+    if(fTo   && l.start > fTo) return false;
+    return true;
+  }).slice().sort((a,b)=>b.start.localeCompare(a.start));
+
+  const countEl = document.getElementById('list-count');
+  if(countEl) countEl.textContent = filtered.length + ' record' + (filtered.length!==1?'s':'');
+
+  if(!filtered.length){
+    container.innerHTML='<div style="text-align:center;padding:40px;color:var(--muted);font-family:monospace;font-size:12px;letter-spacing:0.08em;">NO RECORDS FOUND</div>';
+    return;
+  }
+
+  container.innerHTML = filtered.map(l=>{
+    const days = countDays(l.start, l.end);
+    return `<div class="leave-item">
+      <div class="leave-item-stripe" style="background:${TYPE_COLORS[l.type]||'#888'}"></div>
+      <div class="leave-item-body">
+        <div class="leave-item-name">${l.name}</div>
+        <div class="leave-item-meta">${l.type} · ${formatDate(l.start)} → ${formatDate(l.end)} · ${days} day${days!==1?'s':''}</div>
+        ${l.reason?`<div class="leave-item-meta" style="margin-top:3px">📝 ${l.reason}</div>`:''}
+      </div>
+      <div class="leave-item-actions">
+        <button class="action-btn" onclick="openModalById('${l.id}')" title="View">👁</button>
+        <button class="action-btn" onclick="deleteLeave('${l.id}')" title="Delete" style="color:var(--rust)">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function clearListFilters() {
+  const fFrom = document.getElementById('filter-from');
+  const fTo   = document.getElementById('filter-to');
+  const fType = document.getElementById('filter-type');
+  if(fFrom) fFrom.value = '';
+  if(fTo)   fTo.value   = '';
+  if(fType) fType.value = '';
+  renderList();
+}
+
+function formatDate(d){
+  const [y,m,day]=d.split('-');
+  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${months[parseInt(m)-1]} ${parseInt(day)}, ${y}`;
+}
+
+function deleteLeave(id){
+  if(!confirm('Delete this leave record?')) return;
+  leaves = leaves.filter(l=>l.id!==id);
+  save(); updateStats(); renderCalendar();
+  if(document.getElementById('view-list').classList.contains('active')) renderList();
+  showToast('✓ Record deleted');
+}
+
+// ─── MODAL ───
+function openModalById(id) {
+  const l = leaves.find(x => x.id === id);
+  if (l) openModal(l);
+}
+
+function openModal(l){
+  document.getElementById('modal-name').textContent = l.name;
+  document.getElementById('modal-type').textContent = l.type;
+  document.getElementById('modal-dates').textContent = `${formatDate(l.start)} – ${formatDate(l.end)}`;
+  document.getElementById('modal-days').textContent = countDays(l.start, l.end) + ' days';
+  if(l.reason){
+    document.getElementById('modal-reason').textContent = l.reason;
+    document.getElementById('modal-reason-wrap').style.display='block';
+  } else {
+    document.getElementById('modal-reason-wrap').style.display='none';
+  }
+  document.getElementById('modal').classList.add('open');
+}
+function closeModal(e){
+  if(!e || e.target===document.getElementById('modal'))
+    document.getElementById('modal').classList.remove('open');
+}
+
+// ─── DAY DETAIL MODAL ───
+function openDayModal(dateStr, dayLeaves) {
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const [y, m, d] = dateStr.split('-');
+  const label = `${monthNames[parseInt(m)-1]} ${parseInt(d)}, ${y}`;
+  document.getElementById('day-modal-title').textContent = label;
+  document.getElementById('day-modal-count').textContent =
+    dayLeaves.length === 0 ? 'No leaves' :
+    dayLeaves.length + ' on leave';
+
+  const body = document.getElementById('day-modal-body');
+  if (!dayLeaves.length) {
+    body.innerHTML = `<div style="text-align:center;padding:28px;color:var(--muted);font-family:var(--font-mono);font-size:12px;letter-spacing:0.08em;">NO LEAVES ON THIS DAY</div>`;
+  } else {
+    body.innerHTML = dayLeaves.map(l => {
+      const color = TYPE_COLORS[l.type] || '#888';
+      const days = countDays(l.start, l.end);
+      return `<div style="display:flex;align-items:stretch;gap:0;background:var(--paper);border:1px solid var(--border);border-radius:3px;overflow:hidden;">
+        <div style="width:4px;flex-shrink:0;background:${color};"></div>
+        <div style="padding:12px 14px;flex:1;">
+          <div style="font-weight:600;font-size:14px;margin-bottom:3px;">${l.name}</div>
+          <div style="font-family:var(--font-mono);font-size:10px;color:var(--muted);letter-spacing:0.04em;">
+            <span style="display:inline-block;background:${color}22;color:${color};padding:2px 7px;border-radius:2px;font-weight:600;margin-right:6px;">${l.type}</span>
+            ${formatDate(l.start)} → ${formatDate(l.end)} · ${days} day${days!==1?'s':''}
+          </div>
+          ${l.reason ? `<div style="font-family:var(--font-sans);font-size:12px;color:var(--muted);margin-top:5px;">📝 ${l.reason}</div>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+  }
+  document.getElementById('day-modal').classList.add('open');
+}
+
+function closeDayModal(e) {
+  if (!e || e.target === document.getElementById('day-modal'))
+    document.getElementById('day-modal').classList.remove('open');
+}
+
+// ─── TABS ───
+function setMainTab(view, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.view-section').forEach(s=>s.classList.remove('active'));
+  document.getElementById('view-'+view).classList.add('active');
+  if(view==='list') renderList();
+}
+
+// ─── TOAST ───
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+// ─── SEED DATA ───
+if(!leaves.length){
+  const y=currentYear, m=String(currentMonth+1).padStart(2,'0');
+  leaves = [
+    {id:'a1',name:'Alice Chen',type:'Annual Leave',start:`${y}-${m}-05`,end:`${y}-${m}-07`,reason:'Family trip'},
+    {id:'a2',name:'Bob Kumar',type:'Sick Leave',start:`${y}-${m}-12`,end:`${y}-${m}-12`,reason:'Fever'},
+    {id:'a3',name:'Sara Lee',type:'Work From Home',start:`${y}-${m}-15`,end:`${y}-${m}-16`,reason:''},
+    {id:'a4',name:'James Patel',type:'Compensatory',start:`${y}-${m}-20`,end:`${y}-${m}-21`,reason:'Weekend overtime'},
+    {id:'a5',name:'Alice Chen',type:'Annual Leave',start:`${y}-${m}-25`,end:`${y}-${m}-28`,reason:''},
+  ];
+  save();
+  updateStats();
+  renderCalendar();
+}
+</script>
+
+</body>
+</html>
