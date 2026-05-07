@@ -646,6 +646,7 @@
       <option>Other</option>
     </select>
     <button onclick="clearListFilters()" style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.07em;padding:7px 12px;border:1px solid var(--border);background:var(--paper);border-radius:2px;cursor:pointer;color:var(--muted);">✕ Clear</button>
+    <button onclick="exportToExcel()" style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.07em;padding:7px 14px;border:none;background:var(--ink);color:var(--paper);border-radius:2px;cursor:pointer;">⬇ Export Excel</button>
   </div>
   <div id="leave-list-container" class="leave-list"></div>
 </div>
@@ -900,6 +901,427 @@ function clearListFilters() {
   if(fTo)   fTo.value   = '';
   if(fType) fType.value = '';
   renderList();
+}
+
+// ─── EXPORT TO EXCEL (Full — 4 sheets) ───
+function exportToExcel() {
+  const fTypeEl = document.getElementById('filter-type');
+  const fFromEl = document.getElementById('filter-from');
+  const fToEl   = document.getElementById('filter-to');
+  const fType   = fTypeEl ? fTypeEl.value : '';
+  const fFrom   = fFromEl ? fFromEl.value : '';
+  const fTo     = fToEl   ? fToEl.value   : '';
+
+  const filtered = leaves.filter(l => {
+    if (fType && l.type !== fType) return false;
+    if (fFrom && l.end   < fFrom)  return false;
+    if (fTo   && l.start > fTo)    return false;
+    return true;
+  }).slice().sort((a, b) => a.start.localeCompare(b.start));
+
+  if (!filtered.length) { showToast('⚠ No records to export'); return; }
+
+  const esc = v => String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const exportDate = new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+
+  // ── Type colours ──────────────────────────────────────────────────────────
+  const TC = {
+    'Annual Leave':   {fg:'FF2980B9', bg:'FFD6EAF8'},
+    'Sick Leave':     {fg:'FFC0392B', bg:'FFFADBD8'},
+    'Work From Home': {fg:'FF27AE60', bg:'FFD5F5E3'},
+    'Compensatory':   {fg:'FF8E44AD', bg:'FFE8DAEF'},
+    'Unpaid Leave':   {fg:'FF7A7060', bg:'FFEDE8DE'},
+    'Other':          {fg:'FFE67E22', bg:'FFFDEBD0'},
+  };
+  const typeList = Object.keys(TC);
+
+  // ── Shared ZIP / XML helpers ──────────────────────────────────────────────
+  function strToBytes(str) {
+    const out = [];
+    for (let i = 0; i < str.length; i++) {
+      const c = str.charCodeAt(i);
+      if (c < 128) out.push(c);
+      else if (c < 2048) { out.push(0xC0|(c>>6)); out.push(0x80|(c&63)); }
+      else { out.push(0xE0|(c>>12)); out.push(0x80|((c>>6)&63)); out.push(0x80|(c&63)); }
+    }
+    return new Uint8Array(out);
+  }
+  function crc32(data) {
+    const t = [];
+    for (let i=0;i<256;i++){let c=i;for(let j=0;j<8;j++)c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);t[i]=c;}
+    let crc=0xFFFFFFFF;
+    for(let i=0;i<data.length;i++) crc=t[(crc^data[i])&0xFF]^(crc>>>8);
+    return(crc^0xFFFFFFFF)>>>0;
+  }
+  function u32(n){return[n&0xFF,(n>>8)&0xFF,(n>>16)&0xFF,(n>>24)&0xFF];}
+  function u16(n){return[n&0xFF,(n>>8)&0xFF];}
+  function makeZip(files) {
+    const entries=[], parts=[];
+    let off=0;
+    files.forEach(({name,data})=>{
+      const nb=strToBytes(name), crc=crc32(data);
+      const lh=[0x50,0x4B,0x03,0x04,20,0,0,0,0,0,0,0,0,0,...u32(crc),...u32(data.length),...u32(data.length),...u16(nb.length),0,0,...nb,...data];
+      entries.push({nb,crc,sz:data.length,off}); off+=lh.length; parts.push(new Uint8Array(lh));
+    });
+    const cs=off;
+    entries.forEach(({nb,crc,sz,off:o})=>{
+      const ch=[0x50,0x4B,0x01,0x02,20,0,20,0,0,0,0,0,0,0,0,0,...u32(crc),...u32(sz),...u32(sz),...u16(nb.length),0,0,0,0,0,0,0,0,0,0,0,0,...u32(o),...nb];
+      parts.push(new Uint8Array(ch)); off+=ch.length;
+    });
+    const eocd=[0x50,0x4B,0x05,0x06,0,0,0,0,...u16(entries.length),...u16(entries.length),...u32(off-cs),...u32(cs),0,0];
+    parts.push(new Uint8Array(eocd));
+    const tot=parts.reduce((s,p)=>s+p.length,0), out=new Uint8Array(tot); let pos=0;
+    parts.forEach(p=>{out.set(p,pos);pos+=p.length;}); return out;
+  }
+
+  // ── Styles (shared across all sheets) ────────────────────────────────────
+  // Style index map:
+  // 0=default, 1=title(white/INK), 2=header(white/INK), 3=data-even, 4=data-odd
+  // 5=num-even, 6=num-odd, 7=bold-even, 8=bold-odd
+  // 9=kpi-label, 10=kpi-value, 11=section-hdr, 12=total-row
+  // 13=cal-day, 14=cal-weekend, 15=cal-today, 16=cal-empty
+  // 17=how-section, 18=how-key, 19=how-val
+  const styleXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <fonts count="7">
+    <font><sz val="11"/><name val="Arial"/></font>
+    <font><sz val="16"/><b/><color rgb="FFFFFFFF"/><name val="Arial"/></font>
+    <font><sz val="11"/><b/><color rgb="FFFFFFFF"/><name val="Arial"/></font>
+    <font><sz val="11"/><b/><name val="Arial"/></font>
+    <font><sz val="11"/><color rgb="FF7A7060"/><name val="Arial"/></font>
+    <font><sz val="24"/><b/><name val="Arial"/></font>
+    <font><sz val="9"/><name val="Arial"/></font>
+  </fonts>
+  <fills count="9">
+    <fill><patternFill patternType="none"/></fill>
+    <fill><patternFill patternType="gray125"/></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FF1A1A2E"/></patternFill></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FFF5F0E8"/></patternFill></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FFEDE8DE"/></patternFill></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FFFFF9E6"/></patternFill></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FFD6EAF8"/></patternFill></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FFFFFFFF"/></patternFill></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FFD4A017"/></patternFill></fill>
+  </fills>
+  <borders count="3">
+    <border><left/><right/><top/><bottom/><diagonal/></border>
+    <border><left style="thin"><color rgb="FFC8C0B0"/></left><right style="thin"><color rgb="FFC8C0B0"/></right><top style="thin"><color rgb="FFC8C0B0"/></top><bottom style="thin"><color rgb="FFC8C0B0"/></bottom><diagonal/></border>
+    <border><left style="medium"><color rgb="FFD4A017"/></left><right style="medium"><color rgb="FFD4A017"/></right><top style="medium"><color rgb="FFD4A017"/></top><bottom style="medium"><color rgb="FFD4A017"/></bottom><diagonal/></border>
+  </borders>
+  <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+  <cellXfs count="20">
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+    <xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="center" vertical="center"/></xf>
+    <xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="center" vertical="center"/></xf>
+    <xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyFill="1" applyBorder="1"><alignment vertical="center"/></xf>
+    <xf numFmtId="0" fontId="0" fillId="4" borderId="1" xfId="0" applyFill="1" applyBorder="1"><alignment vertical="center"/></xf>
+    <xf numFmtId="0" fontId="4" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="center" vertical="center"/></xf>
+    <xf numFmtId="0" fontId="4" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="center" vertical="center"/></xf>
+    <xf numFmtId="0" fontId="3" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="center" vertical="center"/></xf>
+    <xf numFmtId="0" fontId="3" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="center" vertical="center"/></xf>
+    <xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="left" vertical="center"/></xf>
+    <xf numFmtId="0" fontId="5" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="center" vertical="center"/></xf>
+    <xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="center" vertical="center"/></xf>
+    <xf numFmtId="0" fontId="3" fillId="8" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="center" vertical="center"/></xf>
+    <xf numFmtId="0" fontId="6" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="6" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="6" fillId="5" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="left" vertical="top" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+    <xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="left" vertical="center"/></xf>
+    <xf numFmtId="0" fontId="3" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1"><alignment horizontal="left" vertical="center"/></xf>
+    <xf numFmtId="0" fontId="0" fillId="7" borderId="1" xfId="0" applyFill="1" applyBorder="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>
+  </cellXfs>
+</styleSheet>`;
+
+  // ── SHEET 1: Leave Register ───────────────────────────────────────────────
+  const regCols = ['A','B','C','D','E','F','G','H','I','J','K'];
+  const regHdrs = ['#','Employee Name','Leave Type','Start Date','End Date','Days','Reason / Notes','Month','Week No.','Duration','Color Band'];
+  const regWidths = [5,22,20,14,14,8,35,13,10,16,16];
+  const DS = 3; // data start row
+
+  let regRows = '';
+  // Title
+  regRows += `<row r="1" ht="36" customHeight="1"><c r="A1" s="1" t="inlineStr"><is><t>LEAVE TRACKER — ${esc(exportDate)}</t></is></c>${regCols.slice(1).map(c=>`<c r="${c}1" s="1"/>`).join('')}</row>`;
+  // Headers
+  regRows += `<row r="2" ht="24" customHeight="1">${regHdrs.map((h,i)=>`<c r="${regCols[i]}2" s="2" t="inlineStr"><is><t>${esc(h)}</t></is></c>`).join('')}</row>`;
+
+  filtered.forEach((l,idx)=>{
+    const r=DS+idx, even=idx%2===0;
+    const sT=even?3:4, sN=even?5:6, sB=even?7:8;
+    const days=countDays(l.start,l.end);
+    const mn=new Date(l.start+'T00:00:00').toLocaleDateString('en-GB',{month:'short',year:'numeric'});
+    const wn=getWeekNum(l.start);
+    const dur=days===1?'Single Day':days<=3?'Short Leave':'Extended Leave';
+    regRows+=`<row r="${r}" ht="20" customHeight="1">
+      <c r="A${r}" s="${sN}"><v>${idx+1}</v></c>
+      <c r="B${r}" s="${sT}" t="inlineStr"><is><t>${esc(l.name)}</t></is></c>
+      <c r="C${r}" s="${sB}" t="inlineStr"><is><t>${esc(l.type)}</t></is></c>
+      <c r="D${r}" s="${sT}" t="inlineStr"><is><t>${esc(l.start)}</t></is></c>
+      <c r="E${r}" s="${sT}" t="inlineStr"><is><t>${esc(l.end)}</t></is></c>
+      <c r="F${r}" s="${sB}"><v>${days}</v></c>
+      <c r="G${r}" s="${sT}" t="inlineStr"><is><t>${esc(l.reason||'')}</t></is></c>
+      <c r="H${r}" s="${sN}" t="inlineStr"><is><t>${esc(mn)}</t></is></c>
+      <c r="I${r}" s="${sN}"><v>${wn}</v></c>
+      <c r="J${r}" s="${sT}" t="inlineStr"><is><t>${esc(dur)}</t></is></c>
+      <c r="K${r}" s="${sB}" t="inlineStr"><is><t>${esc(l.type)}</t></is></c>
+    </row>`;
+  });
+
+  const totR=DS+filtered.length;
+  const totalDays=filtered.reduce((s,l)=>s+countDays(l.start,l.end),0);
+  regRows+=`<row r="${totR}" ht="24" customHeight="1">
+    <c r="A${totR}" s="12" t="inlineStr"><is><t>TOTAL</t></is></c>
+    <c r="B${totR}" s="12" t="inlineStr"><is><t>${filtered.length} records</t></is></c>
+    <c r="C${totR}" s="11"/><c r="D${totR}" s="11"/><c r="E${totR}" s="11"/>
+    <c r="F${totR}" s="12"><v>${totalDays}</v></c>
+    <c r="G${totR}" s="11"/><c r="H${totR}" s="11"/><c r="I${totR}" s="11"/><c r="J${totR}" s="11"/><c r="K${totR}" s="11"/>
+  </row>`;
+
+  // Legend rows
+  const legStart=totR+2;
+  let legRows='';
+  legRows+=`<row r="${legStart}" ht="22" customHeight="1"><c r="A${legStart}" s="2" t="inlineStr"><is><t>LEAVE TYPE LEGEND</t></is></c>${regCols.slice(1).map(c=>`<c r="${c+legStart}" s="11"/>`).join('')}</row>`;
+  typeList.forEach((tp,i)=>{
+    const lr=legStart+1+i;
+    legRows+=`<row r="${lr}" ht="18" customHeight="1"><c r="A${lr}" s="2" t="inlineStr"><is><t>${esc(tp)}</t></is></c></row>`;
+  });
+
+  const regColsXml=regWidths.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join('');
+  const mergesReg=`<mergeCells><mergeCell ref="A1:K1"/><mergeCell ref="A${legStart}:K${legStart}"/></mergeCells>`;
+
+  const sheet1Xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetViews><sheetView workbookViewId="0" showGridLines="0"><selection activeCell="A1"/></sheetView></sheetViews>
+  <sheetFormatPr defaultRowHeight="18"/>
+  <cols>${regColsXml}</cols>
+  <sheetData>${regRows}${legRows}</sheetData>
+  ${mergesReg}
+</worksheet>`;
+
+  // ── SHEET 2: Dashboard ────────────────────────────────────────────────────
+  const totalLeaves=filtered.length;
+  const uniqueEmps=[...new Set(filtered.map(l=>l.name))];
+  const avgDays=totalLeaves>0?(totalDays/totalLeaves).toFixed(1):0;
+
+  let dashRows='';
+  // Title
+  dashRows+=`<row r="1" ht="36" customHeight="1"><c r="A1" s="1" t="inlineStr"><is><t>LEAVE DASHBOARD</t></is></c><c r="B1" s="1"/><c r="C1" s="1"/><c r="D1" s="1"/><c r="E1" s="1"/><c r="F1" s="1"/><c r="G1" s="1"/><c r="H1" s="1"/></row>`;
+  dashRows+=`<row r="2" ht="18" customHeight="1"><c r="A2" s="9" t="inlineStr"><is><t>Auto-calculated from Leave Register</t></is></c></row>`;
+
+  // KPI labels row 4
+  const kpiLabels=['Total Leaves','Total Days','Unique Employees','Avg Days / Leave'];
+  const kpiVals=[totalLeaves,totalDays,uniqueEmps.length,avgDays];
+  const kpiCols=[['A','B'],['C','D'],['E','F'],['G','H']];
+  dashRows+=`<row r="4" ht="22" customHeight="1">${kpiLabels.map((lb,i)=>`<c r="${kpiCols[i][0]}4" s="2" t="inlineStr"><is><t>${esc(lb)}</t></is></c><c r="${kpiCols[i][1]}4" s="11"/>`).join('')}</row>`;
+  dashRows+=`<row r="5" ht="48" customHeight="1">${kpiVals.map((v,i)=>`<c r="${kpiCols[i][0]}5" s="10"><v>${v}</v></c><c r="${kpiCols[i][1]}5" s="10"/>`).join('')}</row>`;
+  dashRows+=`<row r="6" ht="6" customHeight="1">${kpiCols.map(([a,b])=>`<c r="${a}6" s="12"/><c r="${b}6" s="12"/>`).join('')}</row>`;
+
+  // By-Type table header row 8
+  dashRows+=`<row r="8" ht="22" customHeight="1"><c r="A8" s="2" t="inlineStr"><is><t>LEAVES BY TYPE</t></is></c><c r="B8" s="11"/><c r="C8" s="11"/><c r="D8" s="2" t="inlineStr"><is><t>LEAVES BY EMPLOYEE</t></is></c><c r="E8" s="11"/><c r="F8" s="11"/></row>`;
+  dashRows+=`<row r="9" ht="20" customHeight="1"><c r="A9" s="2" t="inlineStr"><is><t>Type</t></is></c><c r="B9" s="2" t="inlineStr"><is><t>Count</t></is></c><c r="C9" s="2" t="inlineStr"><is><t>Days</t></is></c><c r="D9" s="2" t="inlineStr"><is><t>Employee</t></is></c><c r="E9" s="2" t="inlineStr"><is><t>Leaves</t></is></c><c r="F9" s="2" t="inlineStr"><is><t>Days</t></is></c></row>`;
+
+  typeList.forEach((tp,i)=>{
+    const r=10+i, even=i%2===0, sT=even?3:4, sB=even?7:8;
+    const cnt=filtered.filter(l=>l.type===tp).length;
+    const dys=filtered.filter(l=>l.type===tp).reduce((s,l)=>s+countDays(l.start,l.end),0);
+    const emp=uniqueEmps[i];
+    const eCnt=emp?filtered.filter(l=>l.name===emp).length:'';
+    const eDys=emp?filtered.filter(l=>l.name===emp).reduce((s,l)=>s+countDays(l.start,l.end),0):'';
+    dashRows+=`<row r="${r}" ht="20" customHeight="1">
+      <c r="A${r}" s="${sB}" t="inlineStr"><is><t>${esc(tp)}</t></is></c>
+      <c r="B${r}" s="${sB}"><v>${cnt}</v></c>
+      <c r="C${r}" s="${sB}"><v>${dys}</v></c>
+      <c r="D${r}" s="${sT}" t="inlineStr"><is><t>${esc(emp||'')}</t></is></c>
+      <c r="E${r}" s="${sT}">${emp?`<v>${eCnt}</v>`:''}</c>
+      <c r="F${r}" s="${sT}">${emp?`<v>${eDys}</v>`:''}</c>
+    </row>`;
+  });
+
+  // Summary totals
+  const sumR=10+typeList.length;
+  dashRows+=`<row r="${sumR}" ht="22" customHeight="1">
+    <c r="A${sumR}" s="12" t="inlineStr"><is><t>TOTAL</t></is></c>
+    <c r="B${sumR}" s="12"><v>${totalLeaves}</v></c>
+    <c r="C${sumR}" s="12"><v>${totalDays}</v></c>
+    <c r="D${sumR}" s="11"/><c r="E${sumR}" s="11"/><c r="F${sumR}" s="11"/>
+  </row>`;
+
+  const dashColW=[20,12,12,22,12,12,16,16];
+  const dashColsXml=dashColW.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join('');
+  const dashMerges=`<mergeCells>
+    <mergeCell ref="A1:H1"/>
+    <mergeCell ref="A4:B4"/><mergeCell ref="C4:D4"/><mergeCell ref="E4:F4"/><mergeCell ref="G4:H4"/>
+    <mergeCell ref="A5:B5"/><mergeCell ref="C5:D5"/><mergeCell ref="E5:F5"/><mergeCell ref="G5:H5"/>
+    <mergeCell ref="A6:B6"/><mergeCell ref="C6:D6"/><mergeCell ref="E6:F6"/><mergeCell ref="G6:H6"/>
+    <mergeCell ref="A8:C8"/><mergeCell ref="D8:F8"/>
+  </mergeCells>`;
+
+  const sheet2Xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetViews><sheetView workbookViewId="0" showGridLines="0"/></sheetViews>
+  <sheetFormatPr defaultRowHeight="18"/>
+  <cols>${dashColsXml}</cols>
+  <sheetData>${dashRows}</sheetData>
+  ${dashMerges}
+</worksheet>`;
+
+  // ── SHEET 3: Calendar View ────────────────────────────────────────────────
+  const calYear=currentYear, calMonth=currentMonth;
+  const monthNames2=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const firstDay=new Date(calYear,calMonth,1).getDay(); // 0=Sun
+  const startDow=(firstDay+6)%7; // convert to Mon=0
+  const daysInMonth=new Date(calYear,calMonth+1,0).getDate();
+  const todayStr=now.toISOString().split('T')[0];
+  const dayNames=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+  let calRows='';
+  calRows+=`<row r="1" ht="36" customHeight="1"><c r="A1" s="1" t="inlineStr"><is><t>CALENDAR — ${monthNames2[calMonth]} ${calYear}</t></is></c>${['B','C','D','E','F','G'].map(c=>`<c r="${c}1" s="1"/>`).join('')}</row>`;
+  calRows+=`<row r="2" ht="6" customHeight="1"/>`;
+  calRows+=`<row r="3" ht="24" customHeight="1">${dayNames.map((d,i)=>`<c r="${String.fromCharCode(65+i)}3" s="${i>=5?'9':'2'}" t="inlineStr"><is><t>${d}</t></is></c>`).join('')}</row>`;
+
+  let calRow=4, calCol=startDow;
+  const cellMap={};
+  for(let d=1;d<=daysInMonth;d++){
+    const ds=`${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday=ds===todayStr;
+    const isWeekend=calCol>=5;
+    const s=isToday?15:isWeekend?14:13;
+    const dayLeaves2=filtered.filter(l=>l.start<=ds&&l.end>=ds);
+    let txt=String(d);
+    if(dayLeaves2.length) txt+='\n'+dayLeaves2.slice(0,4).map(l=>`● ${l.name.split(' ')[0]} (${l.type.slice(0,3)})`).join('\n')+(dayLeaves2.length>4?`\n+${dayLeaves2.length-4} more`:'');
+    const col=String.fromCharCode(65+calCol);
+    if(!cellMap[calRow]) cellMap[calRow]=[];
+    cellMap[calRow].push({col, s, txt});
+    calCol++;
+    if(calCol>6){calCol=0;calRow++;}
+  }
+  Object.keys(cellMap).forEach(r=>{
+    calRows+=`<row r="${r}" ht="80" customHeight="1">${cellMap[r].map(({col,s,txt})=>`<c r="${col}${r}" s="${s}" t="inlineStr"><is><t>${esc(txt)}</t></is></c>`).join('')}</row>`;
+  });
+
+  const calColsXml=Array(7).fill(0).map((_,i)=>`<col min="${i+1}" max="${i+1}" width="20" customWidth="1"/>`).join('');
+  const sheet3Xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetViews><sheetView workbookViewId="0" showGridLines="0"/></sheetViews>
+  <sheetFormatPr defaultRowHeight="18"/>
+  <cols>${calColsXml}</cols>
+  <sheetData>${calRows}</sheetData>
+  <mergeCells><mergeCell ref="A1:G1"/></mergeCells>
+</worksheet>`;
+
+  // ── SHEET 4: How To Use ───────────────────────────────────────────────────
+  const howSteps=[
+    ['ADDING A LEAVE',[
+      ['Employee Name','Type the full name in Column B'],
+      ['Leave Type','Column C — choose from the 6 types'],
+      ['Start / End Date','Enter dates in YYYY-MM-DD format'],
+      ['Days','Calculated automatically (excl. weekends)'],
+      ['Reason','Optional notes in Column G'],
+    ]],
+    ['AUTO COLUMNS',[
+      ['Days (F)','Excludes Sat & Sun automatically'],
+      ['Month (H)','Extracted from Start Date'],
+      ['Week No. (I)','ISO week number of the start date'],
+      ['Duration (J)','Single Day / Short Leave / Extended Leave'],
+      ['Color Band (K)','Repeats leave type for quick scanning'],
+    ]],
+    ['DASHBOARD',[
+      ['KPI Cards','Total leaves, total days, unique employees, avg days'],
+      ['By-Type Table','Count and days per leave type'],
+      ['By-Employee','How many leaves/days each person has taken'],
+    ]],
+    ['CALENDAR VIEW',[
+      ['Monthly Grid','All leaves plotted on a Mon–Sun calendar'],
+      ['Today','Highlighted with a gold border'],
+      ['Weekends','Saturday & Sunday shown in a darker background'],
+    ]],
+  ];
+  let howRows='';
+  howRows+=`<row r="1" ht="36" customHeight="1"><c r="A1" s="1" t="inlineStr"><is><t>HOW TO USE — LEAVE TRACKER</t></is></c><c r="B1" s="1"/><c r="C1" s="1"/></row>`;
+  let hr=2;
+  howSteps.forEach(([section,items])=>{
+    hr++;
+    howRows+=`<row r="${hr}" ht="24" customHeight="1"><c r="A${hr}" s="17" t="inlineStr"><is><t>  ${esc(section)}</t></is></c><c r="B${hr}" s="11"/><c r="C${hr}" s="11"/></row>`;
+    items.forEach(([k,v])=>{
+      hr++;
+      howRows+=`<row r="${hr}" ht="20" customHeight="1"><c r="A${hr}" s="18" t="inlineStr"><is><t>${esc(k)}</t></is></c><c r="B${hr}" s="19" t="inlineStr"><is><t>${esc(v)}</t></is></c><c r="C${hr}" s="19"/></row>`;
+    });
+  });
+  const howColsXml=`<col min="1" max="1" width="22" customWidth="1"/><col min="2" max="2" width="26" customWidth="1"/><col min="3" max="3" width="50" customWidth="1"/>`;
+  const sheet4Xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetViews><sheetView workbookViewId="0" showGridLines="0"/></sheetViews>
+  <sheetFormatPr defaultRowHeight="18"/>
+  <cols>${howColsXml}</cols>
+  <sheetData>${howRows}</sheetData>
+  <mergeCells><mergeCell ref="A1:C1"/></mergeCells>
+</worksheet>`;
+
+  // ── Workbook XML ──────────────────────────────────────────────────────────
+  const wbXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>
+    <sheet name="Leave Register" sheetId="1" r:id="rId1"/>
+    <sheet name="Dashboard" sheetId="2" r:id="rId2"/>
+    <sheet name="Calendar View" sheetId="3" r:id="rId3"/>
+    <sheet name="How To Use" sheetId="4" r:id="rId4"/>
+  </sheets>
+</workbook>`;
+
+  const relsXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet3.xml"/>
+  <Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet4.xml"/>
+  <Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>`;
+
+  const wbRelsXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`;
+
+  const ctXml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/worksheets/sheet3.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/worksheets/sheet4.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+</Types>`;
+
+  // ── Pack & download ───────────────────────────────────────────────────────
+  const zipFiles=[
+    {name:'[Content_Types].xml',        data:strToBytes(ctXml)},
+    {name:'_rels/.rels',                data:strToBytes(wbRelsXml)},
+    {name:'xl/workbook.xml',            data:strToBytes(wbXml)},
+    {name:'xl/_rels/workbook.xml.rels', data:strToBytes(relsXml)},
+    {name:'xl/styles.xml',              data:strToBytes(styleXml)},
+    {name:'xl/worksheets/sheet1.xml',   data:strToBytes(sheet1Xml)},
+    {name:'xl/worksheets/sheet2.xml',   data:strToBytes(sheet2Xml)},
+    {name:'xl/worksheets/sheet3.xml',   data:strToBytes(sheet3Xml)},
+    {name:'xl/worksheets/sheet4.xml',   data:strToBytes(sheet4Xml)},
+  ];
+
+  const zipBytes=makeZip(zipFiles);
+  const blob=new Blob([zipBytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  const fn=`Leave_Tracker_${new Date().toISOString().split('T')[0]}.xlsx`;
+  a.href=url; a.download=fn; a.click(); URL.revokeObjectURL(url);
+  showToast(`✓ Exported ${filtered.length} records — 4 sheets`);
+}
+
+function getWeekNum(dateStr){
+  const d=new Date(dateStr+'T00:00:00');
+  d.setHours(0,0,0,0);
+  d.setDate(d.getDate()+3-(d.getDay()+6)%7);
+  const w=new Date(d.getFullYear(),0,4);
+  return 1+Math.round(((d-w)/86400000-3+(w.getDay()+6)%7)/7);
 }
 
 function formatDate(d){
