@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -488,19 +487,21 @@
     .sidebar { border-right: none; border-bottom: 1px solid var(--border); }
   }
 </style>
-
 </head>
 <body>
 
 <!-- HEADER -->
-
 <div class="header">
   <div class="header-left">
     <span>Team Space · HR Tools</span>
     <h1>Leave Tracker</h1>
-
   </div>
   <div class="header-right">
+    <div id="sb-status" style="display:flex;align-items:center;gap:8px;margin-right:8px;">
+      <span id="sb-indicator" style="width:8px;height:8px;border-radius:50%;background:#7a7060;display:inline-block;"></span>
+      <span id="sb-label" style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:rgba(245,240,232,0.5);">Local Only</span>
+    </div>
+    <button class="tab-btn" id="sb-btn" onclick="handleSbAuth()">☁ Connect DB</button>
     <button class="tab-btn active" onclick="setMainTab('calendar', this)">📅 Calendar</button>
     <button class="tab-btn" onclick="setMainTab('list', this)">📋 All Leaves</button>
   </div>
@@ -509,7 +510,6 @@
 <div class="main">
 
   <!-- SIDEBAR -->
-
   <div class="sidebar">
     <div class="section-label">Leave Balance</div>
     <div class="stats-strip">
@@ -531,80 +531,76 @@
       </div>
     </div>
 
-```
-<div class="section-label">Request Leave</div>
+    <div class="section-label">Request Leave</div>
 
-<div class="form-group">
-  <label>Employee Name</label>
-  <input type="text" id="f-name" placeholder="e.g. Jane Smith">
-</div>
-
-<div class="form-group">
-  <label>Leave Type</label>
-  <div class="type-grid">
-    <div class="type-option">
-      <input type="radio" name="leave-type" id="t-annual" value="Annual Leave" checked>
-      <label for="t-annual"><span class="type-dot" style="background:#2980b9"></span>Annual</label>
+    <div class="form-group">
+      <label>Employee Name</label>
+      <input type="text" id="f-name" placeholder="e.g. Jane Smith">
     </div>
-    <div class="type-option">
-      <input type="radio" name="leave-type" id="t-sick" value="Sick Leave">
-      <label for="t-sick"><span class="type-dot" style="background:#c0392b"></span>Sick</label>
-    </div>
-    <div class="type-option">
-      <input type="radio" name="leave-type" id="t-wfh" value="Work From Home">
-      <label for="t-wfh"><span class="type-dot" style="background:#27ae60"></span>WFH</label>
-    </div>
-    <div class="type-option">
-      <input type="radio" name="leave-type" id="t-unpaid" value="Unpaid Leave">
-      <label for="t-unpaid"><span class="type-dot" style="background:#7a7060"></span>Unpaid</label>
-    </div>
-    <div class="type-option">
-      <input type="radio" name="leave-type" id="t-comp" value="Compensatory">
-      <label for="t-comp"><span class="type-dot" style="background:#8e44ad"></span>Comp Off</label>
-    </div>
-    <div class="type-option">
-      <input type="radio" name="leave-type" id="t-other" value="Other">
-      <label for="t-other"><span class="type-dot" style="background:#d4a017"></span>Other</label>
-    </div>
-  </div>
-</div>
 
-<div class="form-row">
-  <div class="form-group">
-    <label>Start Date</label>
-    <input type="date" id="f-start">
-  </div>
-  <div class="form-group">
-    <label>End Date</label>
-    <input type="date" id="f-end">
-  </div>
-</div>
+    <div class="form-group">
+      <label>Leave Type</label>
+      <div class="type-grid">
+        <div class="type-option">
+          <input type="radio" name="leave-type" id="t-annual" value="Annual Leave" checked>
+          <label for="t-annual"><span class="type-dot" style="background:#2980b9"></span>Annual</label>
+        </div>
+        <div class="type-option">
+          <input type="radio" name="leave-type" id="t-sick" value="Sick Leave">
+          <label for="t-sick"><span class="type-dot" style="background:#c0392b"></span>Sick</label>
+        </div>
+        <div class="type-option">
+          <input type="radio" name="leave-type" id="t-wfh" value="Work From Home">
+          <label for="t-wfh"><span class="type-dot" style="background:#27ae60"></span>WFH</label>
+        </div>
+        <div class="type-option">
+          <input type="radio" name="leave-type" id="t-unpaid" value="Unpaid Leave">
+          <label for="t-unpaid"><span class="type-dot" style="background:#7a7060"></span>Unpaid</label>
+        </div>
+        <div class="type-option">
+          <input type="radio" name="leave-type" id="t-comp" value="Compensatory">
+          <label for="t-comp"><span class="type-dot" style="background:#8e44ad"></span>Comp Off</label>
+        </div>
+        <div class="type-option">
+          <input type="radio" name="leave-type" id="t-other" value="Other">
+          <label for="t-other"><span class="type-dot" style="background:#d4a017"></span>Other</label>
+        </div>
+      </div>
+    </div>
 
-<div class="form-group">
-  <label>Reason / Notes</label>
-  <textarea id="f-reason" placeholder="Optional: brief reason for leave..."></textarea>
-</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Start Date</label>
+        <input type="date" id="f-start">
+      </div>
+      <div class="form-group">
+        <label>End Date</label>
+        <input type="date" id="f-end">
+      </div>
+    </div>
 
-<button class="submit-btn" onclick="addLeave()">＋ Submit Leave Request</button>
+    <div class="form-group">
+      <label>Reason / Notes</label>
+      <textarea id="f-reason" placeholder="Optional: brief reason for leave..."></textarea>
+    </div>
 
-<!-- Legend -->
-<div style="margin-top:24px;">
-  <div class="section-label">Legend</div>
-  <div class="legend">
-    <div class="legend-item"><div class="legend-dot" style="background:#2980b9"></div>Annual</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#c0392b"></div>Sick</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#27ae60"></div>WFH</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#8e44ad"></div>Comp Off</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#7a7060"></div>Unpaid</div>
-    <div class="legend-item"><div class="legend-dot" style="background:#d4a017"></div>Other</div>
-  </div>
-</div>
-```
+    <button class="submit-btn" onclick="addLeave()">＋ Submit Leave Request</button>
 
+    <!-- Legend -->
+    <div style="margin-top:24px;">
+      <div class="section-label">Legend</div>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#2980b9"></div>Annual</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#c0392b"></div>Sick</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#27ae60"></div>WFH</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#8e44ad"></div>Comp Off</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#7a7060"></div>Unpaid</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#d4a017"></div>Other</div>
+      </div>
+    </div>
   </div>
 
   <!-- CALENDAR PANEL -->
-
   <div class="calendar-panel">
     <!-- Calendar View -->
     <div id="view-calendar" class="view-section active">
@@ -620,44 +616,40 @@
       <div class="cal-grid" id="cal-grid"></div>
     </div>
 
-```
-<!-- List View -->
-<div id="view-list" class="view-section">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-    <div class="section-label" style="margin:0">All Leave Records</div>
-    <span id="list-count" style="font-family:var(--font-mono);font-size:10px;color:var(--muted);letter-spacing:0.06em;"></span>
-  </div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center;">
-    <div style="display:flex;align-items:center;gap:6px;">
-      <label style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);">From</label>
-      <input type="date" id="filter-from" onchange="renderList()" style="font-family:var(--font-mono);font-size:11px;padding:6px 10px;border:1px solid var(--border);background:var(--card);border-radius:2px;color:var(--ink);outline:none;">
+    <!-- List View -->
+    <div id="view-list" class="view-section">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div class="section-label" style="margin:0">All Leave Records</div>
+        <span id="list-count" style="font-family:var(--font-mono);font-size:10px;color:var(--muted);letter-spacing:0.06em;"></span>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <label style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);">From</label>
+          <input type="date" id="filter-from" onchange="renderList()" style="font-family:var(--font-mono);font-size:11px;padding:6px 10px;border:1px solid var(--border);background:var(--card);border-radius:2px;color:var(--ink);outline:none;">
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <label style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);">To</label>
+          <input type="date" id="filter-to" onchange="renderList()" style="font-family:var(--font-mono);font-size:11px;padding:6px 10px;border:1px solid var(--border);background:var(--card);border-radius:2px;color:var(--ink);outline:none;">
+        </div>
+        <select id="filter-type" onchange="renderList()" style="font-family:var(--font-mono);font-size:11px;padding:6px 10px;border:1px solid var(--border);background:var(--card);border-radius:2px;color:var(--ink);">
+          <option value="">All Types</option>
+          <option>Annual Leave</option>
+          <option>Sick Leave</option>
+          <option>Work From Home</option>
+          <option>Compensatory</option>
+          <option>Unpaid Leave</option>
+          <option>Other</option>
+        </select>
+        <button onclick="clearListFilters()" style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.07em;padding:7px 12px;border:1px solid var(--border);background:var(--paper);border-radius:2px;cursor:pointer;color:var(--muted);">✕ Clear</button>
+        <button onclick="exportToExcel()" style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.07em;padding:7px 14px;border:none;background:var(--ink);color:var(--paper);border-radius:2px;cursor:pointer;">⬇ Export Excel</button>
+      </div>
+      <div id="leave-list-container" class="leave-list"></div>
     </div>
-    <div style="display:flex;align-items:center;gap:6px;">
-      <label style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);">To</label>
-      <input type="date" id="filter-to" onchange="renderList()" style="font-family:var(--font-mono);font-size:11px;padding:6px 10px;border:1px solid var(--border);background:var(--card);border-radius:2px;color:var(--ink);outline:none;">
-    </div>
-    <select id="filter-type" onchange="renderList()" style="font-family:var(--font-mono);font-size:11px;padding:6px 10px;border:1px solid var(--border);background:var(--card);border-radius:2px;color:var(--ink);">
-      <option value="">All Types</option>
-      <option>Annual Leave</option>
-      <option>Sick Leave</option>
-      <option>Work From Home</option>
-      <option>Compensatory</option>
-      <option>Unpaid Leave</option>
-      <option>Other</option>
-    </select>
-    <button onclick="clearListFilters()" style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.07em;padding:7px 12px;border:1px solid var(--border);background:var(--paper);border-radius:2px;cursor:pointer;color:var(--muted);">✕ Clear</button>
-    <button onclick="exportToExcel()" style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.07em;padding:7px 14px;border:none;background:var(--ink);color:var(--paper);border-radius:2px;cursor:pointer;">⬇ Export Excel</button>
-  </div>
-  <div id="leave-list-container" class="leave-list"></div>
-</div>
-```
-
   </div>
 
 </div>
 
 <!-- MODAL -->
-
 <div class="modal-overlay" id="modal" onclick="closeModal(event)">
   <div class="modal">
     <h3 id="modal-name"></h3>
@@ -672,7 +664,6 @@
 </div>
 
 <!-- DAY DETAIL POPUP -->
-
 <div class="modal-overlay" id="day-modal" onclick="closeDayModal(event)">
   <div class="modal" style="width:480px;max-width:95vw;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
@@ -689,8 +680,57 @@
   </div>
 </div>
 
-<!-- TOAST -->
+<!-- Supabase Setup Modal -->
+<div class="modal-overlay" id="sb-modal" onclick="closeSbModal(event)">
+  <div class="modal" style="width:500px;max-width:95vw;">
+    <div style="margin-bottom:18px;">
+      <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.12em;color:var(--muted);margin-bottom:6px;">Supabase Sync</div>
+      <h3 style="font-family:var(--font-serif);font-size:20px;">Connect to Supabase</h3>
+    </div>
+    <p style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:16px;">
+      Stores leave data in a free cloud database. Everyone on the team sees the same data in real time — no personal accounts, no file sharing needed.
+    </p>
+    <div style="background:var(--paper);border:1px solid var(--border);border-radius:3px;padding:14px;margin-bottom:16px;">
+      <div style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:10px;">One-time setup (~10 min) — done once by team admin</div>
+      <ol style="font-size:12px;line-height:2.2;color:var(--ink);padding-left:18px;margin:0;">
+        <li>Go to <a href="https://supabase.com" target="_blank" style="color:var(--steel);">supabase.com</a> → New Project (free)</li>
+        <li>Go to <b>SQL Editor</b> and run this query:<br>
+          <code style="display:block;background:var(--ink);color:var(--gold);padding:8px 10px;border-radius:2px;font-size:10px;margin-top:6px;line-height:1.8;">
+            create table leaves (<br>
+            &nbsp;&nbsp;id text primary key,<br>
+            &nbsp;&nbsp;name text, type text,<br>
+            &nbsp;&nbsp;start_date text, end_date text,<br>
+            &nbsp;&nbsp;reason text,<br>
+            &nbsp;&nbsp;created_at timestamptz default now()<br>
+            );<br>
+            alter table leaves enable row level security;<br>
+            create policy "public_all" on leaves for all using (true) with check (true);
+          </code>
+        </li>
+        <li>Go to <b>Project Settings → API</b></li>
+        <li>Copy <b>Project URL</b> and <b>anon public key</b> → paste below</li>
+      </ol>
+    </div>
+    <div style="margin-bottom:12px;">
+      <label style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);display:block;margin-bottom:6px;">Supabase Project URL</label>
+      <input type="text" id="sb-url-input" placeholder="https://xxxxxxxxxxxx.supabase.co"
+        style="width:100%;padding:10px 12px;border:1px solid var(--border);background:var(--paper);font-family:var(--font-mono);font-size:11px;color:var(--ink);border-radius:3px;outline:none;box-sizing:border-box;">
+    </div>
+    <div style="margin-bottom:16px;">
+      <label style="font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);display:block;margin-bottom:6px;">Supabase Anon Public Key</label>
+      <input type="text" id="sb-key-input" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        style="width:100%;padding:10px 12px;border:1px solid var(--border);background:var(--paper);font-family:var(--font-mono);font-size:11px;color:var(--ink);border-radius:3px;outline:none;box-sizing:border-box;">
+      <div style="font-size:11px;color:var(--muted);margin-top:4px;">This is the <b>anon/public</b> key — safe to share with the team.</div>
+    </div>
+    <div id="sb-modal-error" style="display:none;background:#fad5d5;color:#9b1c1c;padding:10px 12px;border-radius:3px;font-size:12px;margin-bottom:14px;"></div>
+    <div class="modal-actions">
+      <button class="btn-outline" onclick="closeSbModal()">Cancel</button>
+      <button onclick="initSupabase()" style="padding:10px 22px;background:var(--ink);color:var(--paper);border:none;font-family:var(--font-mono);font-size:11px;letter-spacing:0.06em;text-transform:uppercase;cursor:pointer;border-radius:2px;">Connect</button>
+    </div>
+  </div>
+</div>
 
+<!-- TOAST -->
 <div class="toast" id="toast"></div>
 
 <script>
@@ -713,10 +753,17 @@ const now = new Date();
 currentYear = now.getFullYear();
 currentMonth = now.getMonth();
 
+// ─── SUPABASE STATE ───
+let sbUrl       = localStorage.getItem('lt-sburl')  || '';
+let sbKey       = localStorage.getItem('lt-sbkey')  || '';
+let sbConnected = false;
+let saveTimer   = null;
+
 // ─── INIT ───
 setTodayDefaults();
 renderCalendar();
 updateStats();
+restoreSupabaseSession();
 
 function setTodayDefaults() {
   const td = now.toISOString().split('T')[0];
@@ -724,8 +771,169 @@ function setTodayDefaults() {
   document.getElementById('f-end').value = td;
 }
 
+// ─── SAVE (local + supabase) ───
 function save() {
   localStorage.setItem('lt-leaves', JSON.stringify(leaves));
+}
+
+// ─── SUPABASE: restore session ───
+function restoreSupabaseSession() {
+  if (sbUrl && sbKey) {
+    sbConnected = true;
+    setSbStatus(true, 'Syncing…');
+    loadFromSupabase();
+  }
+}
+
+// ─── SUPABASE: open/close modal ───
+function handleSbAuth() {
+  if (sbConnected) {
+    if (confirm('Disconnect from Supabase? Data stays local until reconnected.')) {
+      sbUrl = ''; sbKey = ''; sbConnected = false;
+      localStorage.removeItem('lt-sburl');
+      localStorage.removeItem('lt-sbkey');
+      setSbStatus(false, 'Local Only');
+      showToast('✓ Disconnected from Supabase');
+    }
+    return;
+  }
+  if (sbUrl) document.getElementById('sb-url-input').value = sbUrl;
+  if (sbKey) document.getElementById('sb-key-input').value = sbKey;
+  document.getElementById('sb-modal-error').style.display = 'none';
+  document.getElementById('sb-modal').classList.add('open');
+}
+
+function closeSbModal(e) {
+  if (!e || e.target === document.getElementById('sb-modal'))
+    document.getElementById('sb-modal').classList.remove('open');
+}
+
+// ─── SUPABASE: connect ───
+async function initSupabase() {
+  const url = document.getElementById('sb-url-input').value.trim().replace(/\/$/, '');
+  const key = document.getElementById('sb-key-input').value.trim();
+  const errEl = document.getElementById('sb-modal-error');
+
+  if (!url || !key) {
+    errEl.textContent = 'Please enter both the Project URL and Anon Key.';
+    errEl.style.display = 'block'; return;
+  }
+  if (!url.includes('supabase.co')) {
+    errEl.textContent = 'URL should be your Supabase project URL (*.supabase.co)';
+    errEl.style.display = 'block'; return;
+  }
+
+  errEl.style.display = 'none';
+  setSbStatus(false, 'Testing…');
+
+  // Test connection
+  try {
+    const res = await sbFetch('GET', url, key, '/rest/v1/leaves?select=id&limit=1');
+    if (!res.ok && res.status !== 200) {
+      const body = await res.json().catch(()=>({}));
+      errEl.textContent = `Connection failed (${res.status}): ${body.message || body.hint || 'Check your URL and key, and make sure the leaves table exists.'}`;
+      errEl.style.display = 'block';
+      setSbStatus(false, 'Local Only');
+      return;
+    }
+    sbUrl = url; sbKey = key;
+    localStorage.setItem('lt-sburl', sbUrl);
+    localStorage.setItem('lt-sbkey', sbKey);
+    sbConnected = true;
+    document.getElementById('sb-modal').classList.remove('open');
+    showToast('✓ Connected to Supabase');
+    loadFromSupabase();
+  } catch(e) {
+    errEl.textContent = 'Network error — check the URL and try again.';
+    errEl.style.display = 'block';
+    setSbStatus(false, 'Local Only');
+  }
+}
+
+// ─── SUPABASE: fetch helper ───
+function sbFetch(method, url, key, path, body) {
+  const opts = {
+    method,
+    headers: {
+      'apikey': key,
+      'Authorization': 'Bearer ' + key,
+      'Content-Type': 'application/json',
+      'Prefer': method === 'POST' ? 'return=representation' : ''
+    }
+  };
+  if (body) opts.body = JSON.stringify(body);
+  return fetch(url + path, opts);
+}
+
+function sbApi(method, path, body) {
+  return sbFetch(method, sbUrl, sbKey, path, body);
+}
+
+// ─── SUPABASE: load all leaves ───
+async function loadFromSupabase() {
+  try {
+    const res = await sbApi('GET', '/rest/v1/leaves?select=*&order=start_date.asc');
+    if (!res.ok) throw new Error('Load failed');
+    const rows = await res.json();
+    // Map DB columns back to app fields
+    leaves = rows.map(r => ({
+      id:     r.id,
+      name:   r.name,
+      type:   r.type,
+      start:  r.start_date,
+      end:    r.end_date,
+      reason: r.reason || ''
+    }));
+    localStorage.setItem('lt-leaves', JSON.stringify(leaves));
+    renderCalendar();
+    updateStats();
+    if (document.getElementById('view-list').classList.contains('active')) renderList();
+    setSbStatus(true, 'Connected');
+    showToast(`✓ Loaded ${leaves.length} records from Supabase`);
+  } catch(e) {
+    setSbStatus(true, 'Sync error');
+    showToast('⚠ Could not load from Supabase — showing local data');
+  }
+}
+
+// ─── SUPABASE: insert a single leave ───
+async function insertToSupabase(l) {
+  if (!sbConnected) return;
+  try {
+    const res = await sbApi('POST', '/rest/v1/leaves', {
+      id:         l.id,
+      name:       l.name,
+      type:       l.type,
+      start_date: l.start,
+      end_date:   l.end,
+      reason:     l.reason || ''
+    });
+    if (!res.ok) throw new Error('Insert failed');
+    setSbStatus(true, 'Saved ✓');
+    setTimeout(()=>setSbStatus(true,'Connected'), 2000);
+  } catch(e) {
+    showToast('⚠ Failed to save to Supabase');
+  }
+}
+
+// ─── SUPABASE: delete a single leave ───
+async function deleteFromSupabase(id) {
+  if (!sbConnected) return;
+  try {
+    await sbApi('DELETE', `/rest/v1/leaves?id=eq.${id}`);
+  } catch(e) {
+    showToast('⚠ Failed to delete from Supabase');
+  }
+}
+
+// ─── SUPABASE: UI status ───
+function setSbStatus(connected, label) {
+  const dot = document.getElementById("sb-indicator");
+  const lbl = document.getElementById("sb-label");
+  const btn = document.getElementById("sb-btn");
+  if (dot) dot.style.background = connected ? '#27ae60' : '#7a7060';
+  if (lbl) lbl.textContent = label;
+  if (btn) btn.textContent = connected ? `☁ ${label}` : '☁ Connect DB';
 }
 
 // ─── ADD LEAVE ───
@@ -741,8 +949,10 @@ function addLeave() {
   if (start > end) { showToast('⚠ End date must be after start date'); return; }
 
   const id = Date.now().toString(36);
-  leaves.push({ id, name, type, start, end, reason });
+  const newLeave = { id, name, type, start, end, reason };
+  leaves.push(newLeave);
   save();
+  if (sbConnected) insertToSupabase(newLeave);
   updateStats();
   renderCalendar();
   if (document.getElementById('view-list').classList.contains('active')) renderList();
@@ -1333,7 +1543,9 @@ function formatDate(d){
 function deleteLeave(id){
   if(!confirm('Delete this leave record?')) return;
   leaves = leaves.filter(l=>l.id!==id);
-  save(); updateStats(); renderCalendar();
+  save();
+  if (sbConnected) deleteFromSupabase(id);
+  updateStats(); renderCalendar();
   if(document.getElementById('view-list').classList.contains('active')) renderList();
   showToast('✓ Record deleted');
 }
@@ -1431,6 +1643,5 @@ if(!leaves.length){
   renderCalendar();
 }
 </script>
-
 </body>
 </html>
